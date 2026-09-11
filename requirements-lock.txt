@@ -1,0 +1,2 @@
+PySide6_Essentials @ file:///C:/Users/22755/Documents/Codex/2026-09-10/referenced-chatgpt-conversation-this-is-an/work/wheels/pyside6_essentials-6.11.2-cp310-abi3-win_amd64.whl#sha256=c8a29def77032773a30879f7f24415b5395ad08592d147c170824ef4c735dfc1
+shiboken6==6.11.2

@@ -1,0 +1,30 @@
+# Local Python/runtime files
+runtime/
+__pycache__/
+*.py[cod]
+*.pyd
+
+# Build and distribution output
+build/
+release/
+*.zip
+
+# Local user data and backups
+data/
+backups/
+
+# Unused source/rendering scratch assets
+assets/poses/edge_v2/
+assets/poses/walk_a.png
+assets/poses/walk_b.png
+assets/poses/walk_b_v2.png
+assets/poses/walk_fixed_*.png
+walk_0*.png
+
+# Local editor/OS files
+.venv/
+.idea/
+.vscode/
+*.tmp
+Thumbs.db
+Desktop.ini

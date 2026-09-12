@@ -5,8 +5,8 @@ import uuid
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from PySide6.QtCore import QDateTime, Qt
-from PySide6.QtGui import QPixmap
+from PySide6.QtCore import QDateTime, Qt, QRect
+from PySide6.QtGui import QPainter, QPen, QPixmap, QColor
 from PySide6.QtWidgets import (
     QComboBox,
     QDateTimeEdit,
@@ -25,6 +25,8 @@ from PySide6.QtWidgets import (
     QTabWidget,
     QVBoxLayout,
     QWidget,
+    QProxyStyle,
+    QStyle,
 )
 
 from .paths import resource_path
@@ -126,6 +128,40 @@ QDialogButtonBox QPushButton { min-width: 78px; }
 def apply_reminder_theme(dialog):
     arrow_path = str(resource_path("assets", "down-arrow.svg")).replace("\\", "/")
     dialog.setStyleSheet(REMINDER_STYLESHEET.replace("__REMINDER_ARROW_PATH__", arrow_path))
+
+
+class ReminderDateTimeStyle(QProxyStyle):
+    """Paint the calendar button so QDateTimeEdit matches the reminder theme."""
+
+    def drawComplexControl(self, control, option, painter, widget=None):
+        super().drawComplexControl(control, option, painter, widget)
+        if control != QStyle.ComplexControl.CC_ComboBox or not isinstance(widget, QDateTimeEdit):
+            return
+        enabled = bool(option.state & QStyle.StateFlag.State_Enabled)
+        focused = bool(option.state & QStyle.StateFlag.State_HasFocus)
+        background = QColor("#fffdf8" if enabled else "#fbf3e5")
+        border = QColor("#ef9f4d" if focused else ("#e8cfa5" if enabled else "#eadbc4"))
+        arrow = QColor("#9a6a4a" if enabled else "#b6a08b")
+        panel = QRect(widget.width() - 29, 0, 29, widget.height())
+        painter.save()
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        painter.fillRect(panel, background)
+        painter.setPen(QPen(border, 1))
+        painter.drawLine(panel.left(), panel.top() + 1, panel.left(), panel.bottom() - 1)
+        painter.drawLine(panel.right(), panel.top(), panel.right(), panel.bottom())
+        painter.drawLine(panel.left() + 1, panel.bottom(), panel.right() - 1, panel.bottom())
+        center = panel.center()
+        painter.setPen(QPen(arrow, 1.7, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap,
+                            Qt.PenJoinStyle.RoundJoin))
+        painter.drawLine(center.x() - 5, center.y() - 2, center.x(), center.y() + 3)
+        painter.drawLine(center.x(), center.y() + 3, center.x() + 5, center.y() - 2)
+        painter.restore()
+
+
+def style_date_time_edit(widget):
+    # QProxyStyle takes ownership of an explicitly supplied base style. Using
+    # its default base here avoids double-freeing QApplication's shared style.
+    widget.setStyle(ReminderDateTimeStyle())
 
 
 def add_header(layout, compact=False):
@@ -298,6 +334,7 @@ class AddReminderDialog(QDialog):
         self.custom_time.setCalendarPopup(True)
         self.custom_time.setMinimumDateTime(QDateTime.currentDateTime().addSecs(60))
         self.custom_time.setEnabled(False)
+        style_date_time_edit(self.custom_time)
         form.addRow("自定义", self.custom_time)
         layout.addLayout(form)
         hint = QLabel("提醒到点后会持续显示，点击桌宠即可确认。")
@@ -459,6 +496,7 @@ class ReminderCenterDialog(QDialog):
         self.custom_time.setCalendarPopup(True)
         self.custom_time.setMinimumDateTime(QDateTime.currentDateTime().addSecs(60))
         self.custom_time.setEnabled(False)
+        style_date_time_edit(self.custom_time)
         form.addRow("自定义", self.custom_time)
         layout.addLayout(form)
         self.add_feedback = QLabel("提醒到点后会持续显示，点击桌宠即可确认。")

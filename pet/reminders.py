@@ -68,8 +68,22 @@ QComboBox::drop-down, QDateTimeEdit::down-button {
     width: 28px;
     border: 0;
     border-left: 1px solid #f0dfc4;
+    background: #fffdf8;
 }
 QComboBox::down-arrow, QDateTimeEdit::down-arrow {
+    image: url(__REMINDER_ARROW_PATH__);
+    width: 12px;
+    height: 12px;
+}
+QAbstractSpinBox::down-button {
+    subcontrol-origin: padding;
+    subcontrol-position: top right;
+    width: 28px;
+    border: 0;
+    border-left: 1px solid #f0dfc4;
+    background: #fffdf8;
+}
+QAbstractSpinBox::down-arrow {
     image: url(__REMINDER_ARROW_PATH__);
     width: 12px;
     height: 12px;

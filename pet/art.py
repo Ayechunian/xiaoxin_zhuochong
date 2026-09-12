@@ -8,14 +8,14 @@ from .paths import resource_path
 WIDTH, HEIGHT = 110, 130
 CANVAS_WIDTH, CANVAS_HEIGHT = WIDTH * 4, HEIGHT * 4
 STATES = ("Idle", "Walk", "Sleep", "Drag", "Click", "Look", "Angry")
-FRAME_COUNTS = {"Idle": 24, "Walk": 8, "Sleep": 16, "Drag": 8,
+FRAME_COUNTS = {"Idle": 24, "Walk": 6, "Sleep": 16, "Drag": 8,
                 "Click": 8, "Look": 8, "Angry": 8}
 
 
 def _load_poses():
     root = resource_path("assets", "poses")
     names = ("idle", "blink", "walk_1", "walk_2", "walk_3", "walk_4", "walk_5", "walk_6",
-             "walk_7", "walk_8", "sleep", "drag",
+             "sleep", "drag",
              "click", "look", "angry")
     poses = {}
     for name in names:

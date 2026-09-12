@@ -26,17 +26,18 @@ for state, frames in w.frames.items():
     assert all(im.width() == CANVAS_WIDTH and im.height() == CANVAS_HEIGHT for im in frames)
     w.state = state; w.repaint(); app.processEvents()
 assert w.frames['Idle'][0] != w.frames['Idle'][20]
-walk_keyframes = [w.frames['Walk'][index] for index in (0, 2, 4, 6)]
-assert all(walk_keyframes[index] != walk_keyframes[(index + 1) % 4] for index in range(4))
+walk_keyframes = w.frames['Walk']
+assert len(walk_keyframes) == 6
+assert all(walk_keyframes[index] != walk_keyframes[(index + 1) % 6] for index in range(6))
 
 pose_root = Path(__file__).resolve().parent / 'assets' / 'poses'
-walk_sources = [QImage(str(pose_root / f'walk_fixed_{index}.png')) for index in range(1, 5)]
+walk_sources = [QImage(str(pose_root / f'walk_{index}.png')) for index in range(1, 7)]
 assert all(not image.isNull() and image.hasAlphaChannel() for image in walk_sources)
 walk_hashes = [
-    hashlib.sha256((pose_root / f'walk_fixed_{index}.png').read_bytes()).hexdigest()
-    for index in range(1, 5)
+    hashlib.sha256((pose_root / f'walk_{index}.png').read_bytes()).hexdigest()
+    for index in range(1, 7)
 ]
-assert len(set(walk_hashes)) == 4
+assert len(set(walk_hashes)) == 6
 for image in walk_sources:
     transparent_samples = 0
     for x, y in ((0, 0), (image.width() - 1, 0), (0, image.height() - 1), (image.width() - 1, image.height() - 1)):
@@ -56,8 +57,8 @@ def region_difference(first, second, top_ratio):
                 different += 9
     return different / total
 
-walk_leg_differences = [region_difference(walk_keyframes[index], walk_keyframes[(index + 1) % 4], 0.48)
-                        for index in range(4)]
+walk_leg_differences = [region_difference(walk_keyframes[index], walk_keyframes[(index + 1) % 6], 0.48)
+                        for index in range(6)]
 assert min(walk_leg_differences) > 0.08
 center = QPoint(w.width() // 2, w.height() // 2)
 QTest.mouseClick(w, Qt.MouseButton.LeftButton, pos=center)
@@ -129,4 +130,4 @@ for side in ('left', 'right', 'top', 'bottom'):
         assert w.y() + w.height() > area.bottom()
     w.repaint(); app.processEvents()
 w.close()
-print('PASS: 80 high-resolution transparent frames; blink; user-provided four-pose gait; hover/look; click/angry; drag; sleep/wake; resize limits; edge PNG poses; edge perch; bounds')
+print('PASS: 78 high-resolution transparent frames; blink; user-provided six-frame gait; hover/look; click/angry; drag; sleep/wake; resize limits; edge PNG poses; edge perch; bounds')

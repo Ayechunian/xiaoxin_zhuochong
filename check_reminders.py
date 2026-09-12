@@ -38,6 +38,8 @@ with tempfile.TemporaryDirectory() as folder:
 
     w = PetWindow()
     w.timer.stop()
+    # Keep this check independent from the user's persisted menu preference.
+    w.dialogue_enabled = True
     w.reminder_store = reloaded
     w.show()
     app.processEvents()

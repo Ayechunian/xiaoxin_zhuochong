@@ -21,6 +21,8 @@ w = module.PetWindow()
 w.timer.stop()
 w.show()
 app.processEvents()
+# Keep this check independent from the user's persisted menu preference.
+w.dialogue_enabled = True
 temporary = QTemporaryDir()
 assert temporary.isValid()
 w.settings = QSettings(temporary.filePath("focus-test.ini"), QSettings.Format.IniFormat)

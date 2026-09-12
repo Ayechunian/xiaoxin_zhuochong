@@ -20,6 +20,8 @@ w = PetWindow()
 w.timer.stop()
 w.show()
 app.processEvents()
+# Keep this check independent from the user's persisted menu preference.
+w.dialogue_enabled = True
 had_dialogue_setting = w.settings.contains("dialogue/enabled")
 previous_dialogue_setting = w.settings.value("dialogue/enabled")
 

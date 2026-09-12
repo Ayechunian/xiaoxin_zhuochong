@@ -1,0 +1,15 @@
+{
+  "source": {
+    "walk": "assets/source/right_walk_full_rebuild_strip.png",
+    "turn": "assets/source/generated_turn.png",
+    "idle": "assets/source/generated_idle.png"
+  },
+  "runtime_frame_size": [192, 192],
+  "baseline": 187,
+  "groups": {
+    "right_walk": {"count": 8, "layout": "eight rebuilt coherent poses; canonical source", "frame_durations_ms": [100, 110, 130, 180, 100, 180, 110, 90], "cycle_frames": 8, "cycle_ms": 1000, "loop_frame_range": [1, 8]},
+    "turn": {"count": 6, "layout": "single horizontal strip", "order": "right profile -> back -> left profile"},
+    "idle": {"count": 4, "layout": "single horizontal strip", "order": "open -> blink -> breathe -> settle"}
+  },
+  "notes": "The runtime uses right_walk as the single canonical 8-frame coherent walk cycle rebuilt from the supplied character reference. It includes narrow passing/crossing poses instead of only wide contact poses. Leftward walking mirrors each canonical frame at runtime, so foot phase, shoe direction, and body timing cannot drift between separate left and right assets. Frames are alpha-cleaned, cropped to sprite bounds, and bottom-aligned to the shared baseline. Existing Sleep, Drag, Click, Look, Angry and edge assets remain available as additional behavior states."
+}

@@ -31,6 +31,30 @@ def system_idle_seconds():
 
 
 class PetWindow(QWidget):
+    # The simulation heartbeat is independent from visual frame duration.
+    # This follows elapsed-time animation runtimes: a delayed heartbeat does
+    # not silently change the character's walking speed.
+    ANIMATION_TICK_MS = 20
+    FRAME_DURATIONS_MS = {
+        "Idle": 220,
+        # Walk uses the per-pose timing below; this value remains the fallback
+        # for states without a custom timing table.
+        "Walk": 125,
+        "Turn": 80,
+        "Sleep": 380,
+        "Drag": 120,
+        "Click": 90,
+        "Look": 120,
+        "Angry": 90,
+    }
+    # Passing poses (4 and 6) stay on screen longer so the small crossover is
+    # readable at the desktop-pet size. The complete cycle is still 1 second.
+    WALK_FRAME_DURATIONS_MS = (100, 110, 130, 180, 100, 180, 110, 90)
+    WALK_STRIDE_PX = 48
+    WALK_SPEED_PX_PER_SECOND = round(
+        WALK_STRIDE_PX * 1000 /
+        sum(WALK_FRAME_DURATIONS_MS)
+    )
     SCALE_MIN = 0.55
     SCALE_MAX = 2.0
     SCALE_STEP = 0.15
@@ -52,6 +76,9 @@ class PetWindow(QWidget):
         "sleepy": ("Z", QColor("#8c83c6"), "困倦"),
         "grumpy": ("!", QColor("#e76e55"), "小生气"),
     }
+    IDLE_BLINK_GAP_SECONDS = (4.0, 8.0)
+    IDLE_BLINK_CLOSED_MS = 95
+    IDLE_BLINK_OPEN_MS = 110
 
     def __init__(self):
         super().__init__()
@@ -62,16 +89,30 @@ class PetWindow(QWidget):
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         self.setMouseTracking(True)
         self.scale_factor = 1.0
+        self.direction = 1
+        self.turn_target = 1
         self.setFixedSize(WIDTH, HEIGHT)
         self.frames = {state: [frame(state, i) for i in range(FRAME_COUNTS[state])]
                        for state in STATES}
+        self.walk_left_frames = [
+            frame("Walk", i, direction=-1) for i in range(FRAME_COUNTS["Walk"])
+        ]
+        self.turn_right_frames = [
+            frame("Turn", i, turn_direction=1) for i in range(FRAME_COUNTS["Turn"])
+        ]
         self.edge_frames = self.load_edge_frames()
         self.state = "Idle"
         self.state_tick = 0
+        self.animation_elapsed_ms = 0.0
+        self.animation_last_at = time.monotonic()
+        self.walk_motion_remainder = 0.0
         self.last_touch = time.monotonic()
         self.until = 0.0
         self.next_walk = 0.0
-        self.direction = 1
+        self.idle_blink_phase = 0
+        self.idle_blink_count = 0
+        self.idle_blink_until = 0.0
+        self.next_idle_blink = time.monotonic() + random.uniform(*self.IDLE_BLINK_GAP_SECONDS)
         self.edge_until = 0.0
         self.edge_side = None
         self.edge_focus_last_second = None
@@ -119,7 +160,7 @@ class PetWindow(QWidget):
         self.reset_position()
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.tick)
-        self.timer.start(100)
+        self.timer.start(self.ANIMATION_TICK_MS)
         QApplication.instance().screenRemoved.connect(lambda _: self.reset_position())
         for screen in QApplication.screens():
             screen.availableGeometryChanged.connect(lambda _: self.keep_visible())
@@ -443,7 +484,49 @@ class PetWindow(QWidget):
         if state != self.state:
             self.state = state
             self.state_tick = 0
+            self.animation_elapsed_ms = 0.0
+            self.animation_last_at = time.monotonic()
+            self.walk_motion_remainder = 0.0
+            if state == "Idle":
+                self.idle_blink_phase = 0
+                self.idle_blink_count = 0
+                self.idle_blink_until = 0.0
+                self.next_idle_blink = time.monotonic() + random.uniform(
+                    *self.IDLE_BLINK_GAP_SECONDS
+                )
+            if hasattr(self, "timer"):
+                self.timer.setInterval(self.ANIMATION_TICK_MS)
         self.update()
+
+    def update_idle_blink(self, now):
+        """Advance an occasional natural blink without cycling closed eyes."""
+        if self.state != "Idle":
+            return
+        if self.idle_blink_phase == 0:
+            if now < self.next_idle_blink:
+                return
+            self.idle_blink_count = random.choice((1, 1, 2))
+            self.idle_blink_phase = 1
+            self.idle_blink_until = now + self.IDLE_BLINK_CLOSED_MS / 1000.0
+            return
+        if now < self.idle_blink_until:
+            return
+        if self.idle_blink_phase == 1:
+            self.idle_blink_count -= 1
+            if self.idle_blink_count > 0:
+                self.idle_blink_phase = 2
+                self.idle_blink_until = now + self.IDLE_BLINK_OPEN_MS / 1000.0
+            else:
+                self.idle_blink_phase = 0
+                self.next_idle_blink = now + random.uniform(*self.IDLE_BLINK_GAP_SECONDS)
+        else:
+            self.idle_blink_phase = 1
+            self.idle_blink_until = now + self.IDLE_BLINK_CLOSED_MS / 1000.0
+
+    def current_frame_duration_ms(self):
+        if self.state == "Walk":
+            return self.WALK_FRAME_DURATIONS_MS[self.state_tick % FRAME_COUNTS["Walk"]]
+        return self.FRAME_DURATIONS_MS.get(self.state, 120)
 
     def screen_for_point(self, point):
         screen = QApplication.screenAt(point)
@@ -582,10 +665,18 @@ class PetWindow(QWidget):
         self.set_pet_scale(1.0)
 
     def tick(self):
-        self.state_tick += 1
         now = time.monotonic()
         if self.mood_until and now >= self.mood_until:
             self.set_mood("calm")
+        elapsed_ms = max(0.0, min(250.0, (now - self.animation_last_at) * 1000.0))
+        self.animation_last_at = now
+        self.animation_elapsed_ms += elapsed_ms
+        frame_duration = self.current_frame_duration_ms()
+        while self.animation_elapsed_ms >= frame_duration:
+            self.animation_elapsed_ms -= frame_duration
+            self.state_tick += 1
+            frame_duration = self.current_frame_duration_ms()
+        self.update_idle_blink(now)
         if self.bubble.isVisible():
             self.bubble.follow(self.frameGeometry(), self.screen_area())
         if self.press is not None or self.menu_open:
@@ -622,7 +713,7 @@ class PetWindow(QWidget):
             self.clear_edge()
             self.set_state("Look" if self.hovered else "Idle")
         if self.focus_active():
-            if self.state == "Walk" or self.state == "Sleep":
+            if self.state in ("Walk", "Turn", "Sleep"):
                 self.set_state("Look" if self.hovered else "Idle")
             elif self.state in ("Click", "Angry") and now >= self.until:
                 self.set_state("Look" if self.hovered else "Idle")
@@ -648,8 +739,19 @@ class PetWindow(QWidget):
         elif self.state in ("Click", "Angry"):
             if now >= self.until:
                 self.set_state("Look" if self.hovered else "Idle")
+        elif self.state == "Turn":
+            if self.state_tick >= FRAME_COUNTS["Turn"]:
+                self.direction = self.turn_target
+                self.until = now + random.uniform(2, 5)
+                self.set_state("Walk")
         elif self.state == "Walk":
-            self.move(self.x() + self.direction * 3, self.y())
+            # Match translation to the in-place walk cycle: stride / cycle time.
+            distance = self.direction * self.WALK_SPEED_PX_PER_SECOND * elapsed_ms / 1000.0
+            distance += self.walk_motion_remainder
+            step = int(distance)
+            self.walk_motion_remainder = distance - step
+            if step:
+                self.move(self.x() + step, self.y())
             area = self.screen_area()
             if self.direction < 0 and self.x() <= area.left():
                 self.perch_on_edge("left", now)
@@ -667,9 +769,13 @@ class PetWindow(QWidget):
         elif self.state == "Look":
             self.set_state("Idle")
         elif self.auto_walk_enabled and now >= self.next_walk:
-            self.direction = random.choice((-1, 1))
+            new_direction = random.choice((-1, 1))
             self.until = now + random.uniform(2, 5)
-            self.set_state("Walk")
+            if new_direction == self.direction:
+                self.set_state("Walk")
+            else:
+                self.turn_target = new_direction
+                self.set_state("Turn")
             self.set_mood("playful", 8)
             self.talk("walk")
         elif not self.auto_walk_enabled:
@@ -686,10 +792,18 @@ class PetWindow(QWidget):
             rect, _ = self.edge_layout(self.edge_side)
             p.drawImage(rect, self.edge_frames[self.edge_side])
             return
-        image = self.frames[self.state][self.state_tick % len(self.frames[self.state])]
+        frames = self.frames[self.state]
+        if self.state == "Walk" and self.direction < 0:
+            frames = self.walk_left_frames
+        if self.state == "Turn" and self.turn_target > 0:
+            frames = self.turn_right_frames
+        if self.state == "Idle":
+            image = frames[1 if self.idle_blink_phase == 1 else 0]
+        else:
+            image = frames[self.state_tick % len(frames)]
         flip = (self.edge_side is None and
-                ((self.state == "Walk" and self.direction < 0) or
-                (self.state == "Look" and QCursor.pos().x() < self.frameGeometry().center().x())))
+                ((self.state == "Look" and
+                  QCursor.pos().x() < self.frameGeometry().center().x())))
         if flip:
             p.translate(self.width(), 0); p.scale(-1, 1)
         p.drawImage(self.rect(), image)

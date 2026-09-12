@@ -9,6 +9,7 @@ a = Analysis(
     binaries=[],
     datas=[
         (str(project / "assets" / "poses"), "assets/poses"),
+        (str(project / "assets" / "sheet_animations"), "assets/sheet_animations"),
         (str(project / "assets" / "pet.ico"), "assets"),
         (str(project / "assets" / "character.png"), "assets"),
         (str(project / "assets" / "down-arrow.svg"), "assets"),

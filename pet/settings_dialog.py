@@ -11,7 +11,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
 )
 
-from .reminders import REMINDER_STYLESHEET
+from .reminders import apply_reminder_theme
 
 
 class SettingsDialog(QDialog):
@@ -22,7 +22,7 @@ class SettingsDialog(QDialog):
         self.pet = pet
         self.setWindowTitle("小新设置中心")
         self.setMinimumWidth(440)
-        self.setStyleSheet(REMINDER_STYLESHEET)
+        apply_reminder_theme(self)
 
         root = QVBoxLayout(self)
         root.setContentsMargins(16, 14, 16, 14)

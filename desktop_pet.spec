@@ -11,6 +11,7 @@ a = Analysis(
         (str(project / "assets" / "poses"), "assets/poses"),
         (str(project / "assets" / "pet.ico"), "assets"),
         (str(project / "assets" / "character.png"), "assets"),
+        (str(project / "assets" / "down-arrow.svg"), "assets"),
         (str(project / "pet" / "speak.ps1"), "pet"),
     ],
     hiddenimports=[],

@@ -62,11 +62,17 @@ QLineEdit, QComboBox, QDateTimeEdit {
 QLineEdit, QComboBox { padding: 7px 9px; }
 QDateTimeEdit { padding: 7px 32px 7px 9px; }
 QLineEdit:focus, QComboBox:focus, QDateTimeEdit:focus { border: 1px solid #ef9f4d; }
-QComboBox::drop-down { border: 0; width: 24px; }
-QDateTimeEdit::up-button, QDateTimeEdit::down-button {
-    width: 0;
-    height: 0;
+QComboBox::drop-down, QDateTimeEdit::down-button {
+    subcontrol-origin: padding;
+    subcontrol-position: top right;
+    width: 28px;
     border: 0;
+    border-left: 1px solid #f0dfc4;
+}
+QComboBox::down-arrow, QDateTimeEdit::down-arrow {
+    image: url(__REMINDER_ARROW_PATH__);
+    width: 12px;
+    height: 12px;
 }
 QDateTimeEdit:disabled {
     color: #9d8a79;
@@ -104,7 +110,8 @@ QDialogButtonBox QPushButton { min-width: 78px; }
 
 
 def apply_reminder_theme(dialog):
-    dialog.setStyleSheet(REMINDER_STYLESHEET)
+    arrow_path = str(resource_path("assets", "down-arrow.svg")).replace("\\", "/")
+    dialog.setStyleSheet(REMINDER_STYLESHEET.replace("__REMINDER_ARROW_PATH__", arrow_path))
 
 
 def add_header(layout, compact=False):

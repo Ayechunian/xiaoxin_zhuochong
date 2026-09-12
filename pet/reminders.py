@@ -57,11 +57,22 @@ QLineEdit, QComboBox, QDateTimeEdit {
     color: #49332c;
     border: 1px solid #e8cfa5;
     border-radius: 10px;
-    padding: 7px 9px;
     selection-background-color: #f2bd43;
 }
-QLineEdit:focus, QComboBox:focus, QDateTimeEdit:focus { border: 2px solid #ef9f4d; padding: 6px 8px; }
+QLineEdit, QComboBox { padding: 7px 9px; }
+QDateTimeEdit { padding: 7px 32px 7px 9px; }
+QLineEdit:focus, QComboBox:focus, QDateTimeEdit:focus { border: 1px solid #ef9f4d; }
 QComboBox::drop-down { border: 0; width: 24px; }
+QDateTimeEdit::up-button, QDateTimeEdit::down-button {
+    width: 0;
+    height: 0;
+    border: 0;
+}
+QDateTimeEdit:disabled {
+    color: #9d8a79;
+    background: #fbf3e5;
+    border-color: #eadbc4;
+}
 QListWidget {
     background: #fffdf8;
     color: #49332c;

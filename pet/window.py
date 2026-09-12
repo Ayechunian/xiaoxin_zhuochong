@@ -160,6 +160,7 @@ class PetWindow(QWidget):
         self.settings.setValue("behavior/sleep_after", self.sleep_after)
         self.set_dialogue_enabled(bool(values.get("dialogue_enabled", self.dialogue_enabled)))
         self.set_voice_enabled(bool(values.get("voice_enabled", self.voice_enabled)))
+        self.set_chatter_level(values.get("chatter_level", self.chatter_level))
         if not self.auto_walk_enabled and self.state == "Walk":
             self.set_state("Idle")
         self.schedule_next_walk()
@@ -806,28 +807,6 @@ class PetWindow(QWidget):
                 focus_menu.addAction(
                     f"开始 {minutes} 分钟",
                     lambda checked=False, value=minutes: self.start_focus(value))
-        menu.addSeparator()
-        dialogue_action = menu.addAction("显示对话气泡")
-        dialogue_action.setCheckable(True)
-        dialogue_action.setChecked(self.dialogue_enabled)
-        dialogue_action.triggered.connect(self.set_dialogue_enabled)
-        voice_action = menu.addAction("顽皮童声")
-        voice_action.setCheckable(True)
-        voice_action.setChecked(self.voice_enabled)
-        voice_action.setEnabled(self.voice.available)
-        if not self.voice.available:
-            voice_action.setText("顽皮童声（本机不可用）")
-        voice_action.triggered.connect(self.set_voice_enabled)
-        preview_action = menu.addAction("试听一句")
-        preview_action.setEnabled(self.dialogue_enabled and self.voice_enabled)
-        preview_action.triggered.connect(lambda: self.talk("greeting", force=True))
-        frequency_menu = menu.addMenu("主动说话频率")
-        for key, label in (("low", "较少"), ("normal", "正常"), ("high", "较多")):
-            action = frequency_menu.addAction(label)
-            action.setCheckable(True)
-            action.setChecked(self.chatter_level == key)
-            action.triggered.connect(
-                lambda checked, value=key: checked and self.set_chatter_level(value))
         menu.addSeparator()
         menu.addAction("放大  Ctrl++", lambda: self.adjust_scale(self.SCALE_STEP))
         menu.addAction("缩小  Ctrl+-", lambda: self.adjust_scale(-self.SCALE_STEP))

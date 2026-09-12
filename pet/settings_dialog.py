@@ -63,6 +63,15 @@ class SettingsDialog(QDialog):
         self.voice_enabled.setChecked(pet.voice_enabled)
         self.voice_enabled.setEnabled(pet.voice.available)
         form.addRow("声音", self.voice_enabled)
+
+        self.chatter_frequency = QComboBox()
+        for label, key in (("较少（约 90 秒）", "low"),
+                           ("正常（约 45 秒）", "normal"),
+                           ("较多（约 20 秒）", "high")):
+            self.chatter_frequency.addItem(label, key)
+        chatter = pet.chatter_level if pet.chatter_level in {"low", "normal", "high"} else "normal"
+        self.chatter_frequency.setCurrentIndex(max(0, self.chatter_frequency.findData(chatter)))
+        form.addRow("主动说话", self.chatter_frequency)
         root.addLayout(form)
 
         hint = QLabel("设置会自动保存。心情会根据你的点击、提醒完成和休息情况变化。")
@@ -85,5 +94,6 @@ class SettingsDialog(QDialog):
             "sleep_after": self.sleep_after.value(),
             "dialogue_enabled": self.dialogue_enabled.isChecked(),
             "voice_enabled": self.voice_enabled.isChecked(),
+            "chatter_level": self.chatter_frequency.currentData(),
         })
         self.accept()

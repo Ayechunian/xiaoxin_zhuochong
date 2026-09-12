@@ -5,7 +5,7 @@ import uuid
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from PySide6.QtCore import QDateTime, Qt, QRect
+from PySide6.QtCore import QDateTime, Qt, QRect, QPoint
 from PySide6.QtGui import QPainter, QPen, QPixmap, QColor
 from PySide6.QtWidgets import (
     QComboBox,
@@ -54,7 +54,7 @@ QLabel#headerSubtitle { color: #89644e; font-size: 12px; }
 QLabel#sectionTitle { color: #5a382c; font-size: 15px; font-weight: 800; }
 QLabel#summary { color: #6f4b3b; font-weight: 700; padding: 5px 2px; }
 QLabel#feedback { color: #806052; padding: 7px 10px; background: #fffdf8; border: 1px solid #f1dfc2; border-radius: 10px; }
-QLineEdit, QComboBox, QDateTimeEdit {
+QLineEdit, QComboBox, QDateTimeEdit, QSpinBox {
     background: #fffdf8;
     color: #49332c;
     border: 1px solid #e8cfa5;
@@ -62,33 +62,61 @@ QLineEdit, QComboBox, QDateTimeEdit {
     selection-background-color: #f2bd43;
 }
 QLineEdit, QComboBox { padding: 7px 9px; }
-QDateTimeEdit { padding: 7px 32px 7px 9px; }
-QLineEdit:focus, QComboBox:focus, QDateTimeEdit:focus { border: 1px solid #ef9f4d; }
-QComboBox::drop-down, QDateTimeEdit::down-button {
-    subcontrol-origin: padding;
+QDateTimeEdit, QSpinBox { padding: 7px 36px 7px 9px; }
+QLineEdit:focus, QComboBox:focus, QDateTimeEdit:focus, QSpinBox:focus { border: 1px solid #ef9f4d; }
+QComboBox::drop-down {
+    subcontrol-origin: border;
     subcontrol-position: top right;
-    width: 28px;
-    border: 0;
+    width: 32px;
+    margin: 0;
+    border: 1px solid #e8cfa5;
     border-left: 1px solid #f0dfc4;
     background: #fffdf8;
+    border-top-right-radius: 9px;
+    border-bottom-right-radius: 9px;
 }
-QComboBox::down-arrow, QDateTimeEdit::down-arrow {
+QComboBox::down-arrow {
     image: url(__REMINDER_ARROW_PATH__);
     width: 12px;
     height: 12px;
 }
-QAbstractSpinBox::down-button {
-    subcontrol-origin: padding;
-    subcontrol-position: top right;
-    width: 28px;
-    border: 0;
+QAbstractSpinBox::up-button, QAbstractSpinBox::down-button {
+    subcontrol-origin: border;
+    width: 32px;
+    margin: 0;
     border-left: 1px solid #f0dfc4;
+    border-right: 1px solid #e8cfa5;
     background: #fffdf8;
+}
+QAbstractSpinBox::up-button {
+    subcontrol-position: top right;
+    height: 16px;
+    border-top: 1px solid #e8cfa5;
+    border-top-right-radius: 9px;
+}
+QAbstractSpinBox::down-button {
+    subcontrol-position: bottom right;
+    height: 16px;
+    border-bottom: 1px solid #e8cfa5;
+    border-bottom-right-radius: 9px;
+}
+QAbstractSpinBox::up-arrow {
+    image: url(__REMINDER_UP_ARROW_PATH__);
+    width: 12px;
+    height: 12px;
 }
 QAbstractSpinBox::down-arrow {
     image: url(__REMINDER_ARROW_PATH__);
     width: 12px;
     height: 12px;
+}
+QDateTimeEdit::down-button {
+    subcontrol-origin: border;
+    subcontrol-position: top right;
+    width: 32px;
+    margin: 0;
+    border: 0;
+    background: #fffdf8;
 }
 QDateTimeEdit:disabled {
     color: #9d8a79;
@@ -127,7 +155,12 @@ QDialogButtonBox QPushButton { min-width: 78px; }
 
 def apply_reminder_theme(dialog):
     arrow_path = str(resource_path("assets", "down-arrow.svg")).replace("\\", "/")
-    dialog.setStyleSheet(REMINDER_STYLESHEET.replace("__REMINDER_ARROW_PATH__", arrow_path))
+    up_arrow_path = str(resource_path("assets", "up-arrow.svg")).replace("\\", "/")
+    dialog.setStyleSheet(
+        REMINDER_STYLESHEET
+        .replace("__REMINDER_ARROW_PATH__", arrow_path)
+        .replace("__REMINDER_UP_ARROW_PATH__", up_arrow_path)
+    )
 
 
 class ReminderDateTimeStyle(QProxyStyle):
@@ -142,15 +175,13 @@ class ReminderDateTimeStyle(QProxyStyle):
         background = QColor("#fffdf8" if enabled else "#fbf3e5")
         border = QColor("#ef9f4d" if focused else ("#e8cfa5" if enabled else "#eadbc4"))
         arrow = QColor("#9a6a4a" if enabled else "#b6a08b")
-        panel = QRect(widget.width() - 29, 0, 29, widget.height())
+        panel = QRect(widget.width() - 32, 1, 31, max(1, widget.height() - 2))
         painter.save()
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         painter.fillRect(panel, background)
         painter.setPen(QPen(border, 1))
         painter.drawLine(panel.left(), panel.top() + 1, panel.left(), panel.bottom() - 1)
-        painter.drawLine(panel.right(), panel.top(), panel.right(), panel.bottom())
-        painter.drawLine(panel.left() + 1, panel.bottom(), panel.right() - 1, panel.bottom())
-        center = panel.center()
+        center = QPoint(panel.left() + panel.width() // 2, widget.height() // 2)
         painter.setPen(QPen(arrow, 1.7, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap,
                             Qt.PenJoinStyle.RoundJoin))
         painter.drawLine(center.x() - 5, center.y() - 2, center.x(), center.y() + 3)

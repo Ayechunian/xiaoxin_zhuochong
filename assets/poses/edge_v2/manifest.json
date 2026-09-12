@@ -1,0 +1,37 @@
+{
+  "reference_head_width": 65.0,
+  "poses": {
+    "left": {
+      "file": "rendered/left.png",
+      "head_width": 260.0,
+      "anchor": [
+        85.412,
+        300.682
+      ]
+    },
+    "right": {
+      "file": "rendered/right.png",
+      "head_width": 260.0,
+      "anchor": [
+        365.915,
+        276.703
+      ]
+    },
+    "bottom": {
+      "file": "rendered/bottom.png",
+      "head_width": 260.0,
+      "anchor": [
+        220.0,
+        365.492
+      ]
+    },
+    "top": {
+      "file": "rendered/top.png",
+      "head_width": 260.0,
+      "anchor": [
+        220.0,
+        120.95
+      ]
+    }
+  }
+}

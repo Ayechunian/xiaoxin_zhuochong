@@ -161,13 +161,15 @@ class ReminderStore:
             json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
         os.replace(temporary, self.path)
 
-    def add(self, text, due_at):
+    def add(self, text, due_at, repeat="none"):
+        repeat = repeat if repeat in {"none", "daily", "weekly"} else "none"
         item = {
             "id": uuid.uuid4().hex,
             "text": text.strip()[:120],
             "due_at": float(due_at),
             "created_at": time.time(),
             "status": "pending",
+            "repeat": repeat,
         }
         if not item["text"]:
             raise ValueError("提醒内容不能为空")
@@ -192,6 +194,18 @@ class ReminderStore:
         item = self.get(reminder_id)
         if item is None:
             return False
+        repeat = item.get("repeat", "none")
+        if repeat in {"daily", "weekly"}:
+            interval = 86400 if repeat == "daily" else 7 * 86400
+            next_due = float(item.get("due_at", time.time())) + interval
+            now = time.time()
+            while next_due <= now:
+                next_due += interval
+            item["due_at"] = next_due
+            item["last_completed_at"] = now
+            item["status"] = "pending"
+            self.save()
+            return True
         item["status"] = "completed"
         item["completed_at"] = time.time()
         self.save()
@@ -243,6 +257,10 @@ class AddReminderDialog(QDialog):
         for label, kind, value in self.PRESETS:
             self.preset.addItem(label, (kind, value))
         form.addRow("提醒时间", self.preset)
+        self.repeat = QComboBox()
+        for label, key in (("不重复", "none"), ("每天", "daily"), ("每周", "weekly")):
+            self.repeat.addItem(label, key)
+        form.addRow("重复提醒", self.repeat)
         self.custom_time = QDateTimeEdit(QDateTime.currentDateTime().addSecs(3600))
         self.custom_time.setDisplayFormat("yyyy-MM-dd HH:mm")
         self.custom_time.setCalendarPopup(True)
@@ -333,7 +351,8 @@ class ReminderManagerDialog(QDialog):
         self.summary.setText(f"共有 {len(pending)} 条待处理提醒")
         for reminder in pending:
             due = datetime.fromtimestamp(float(reminder["due_at"])).strftime("%m-%d %H:%M")
-            item = QListWidgetItem(f"{due}   {reminder['text']}")
+            repeat_label = {"daily": " · 每天", "weekly": " · 每周"}.get(reminder.get("repeat", "none"), "")
+            item = QListWidgetItem(f"{due}{repeat_label}   {reminder['text']}")
             item.setData(Qt.ItemDataRole.UserRole, reminder["id"])
             self.list.addItem(item)
         if not pending:
@@ -399,6 +418,10 @@ class ReminderCenterDialog(QDialog):
         for label, kind, value in self.PRESETS:
             self.preset.addItem(label, (kind, value))
         form.addRow("提醒时间", self.preset)
+        self.repeat = QComboBox()
+        for label, key in (("不重复", "none"), ("每天", "daily"), ("每周", "weekly")):
+            self.repeat.addItem(label, key)
+        form.addRow("重复提醒", self.repeat)
         self.custom_time = QDateTimeEdit(QDateTime.currentDateTime().addSecs(3600))
         self.custom_time.setDisplayFormat("yyyy-MM-dd HH:mm")
         self.custom_time.setCalendarPopup(True)
@@ -476,7 +499,7 @@ class ReminderCenterDialog(QDialog):
             self.add_feedback.setText("提醒时间需要晚于现在。")
             self.add_feedback.setStyleSheet("color: #9b3f43; font-weight: 600;")
             return
-        reminder = self.store.add(text, due_at)
+        reminder = self.store.add(text, due_at, self.repeat.currentData())
         due_text = datetime.fromtimestamp(due_at).strftime("%m-%d %H:%M")
         self.add_feedback.setText(f"已添加：{due_text}  {text}")
         self.add_feedback.setStyleSheet("color: #47735b; font-weight: 600;")
@@ -492,7 +515,8 @@ class ReminderCenterDialog(QDialog):
         self.tabs.setTabText(1, f"管理提醒（{len(pending)}）")
         for reminder in pending:
             due = datetime.fromtimestamp(float(reminder["due_at"])).strftime("%m-%d %H:%M")
-            item = QListWidgetItem(f"{due}   {reminder['text']}")
+            repeat_label = {"daily": " · 每天", "weekly": " · 每周"}.get(reminder.get("repeat", "none"), "")
+            item = QListWidgetItem(f"{due}{repeat_label}   {reminder['text']}")
             item.setData(Qt.ItemDataRole.UserRole, reminder["id"])
             self.list.addItem(item)
         if not pending:

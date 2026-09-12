@@ -5,13 +5,14 @@ import time
 from datetime import datetime
 
 from PySide6.QtCore import Qt, QTimer, QPoint, QPointF, QRectF, QSettings
-from PySide6.QtGui import QCursor, QImage, QPainter
+from PySide6.QtGui import QColor, QCursor, QFont, QImage, QPainter
 from PySide6.QtWidgets import QApplication, QMenu, QWidget
 
 from .art import FRAME_COUNTS, HEIGHT, STATES, WIDTH, frame
 from .dialogue import DialogueLibrary, SpeechBubble
 from .paths import resource_path, user_data_file
 from .reminders import ReminderCenterDialog, ReminderStore
+from .settings_dialog import SettingsDialog
 from .voice import VoiceEngine
 
 
@@ -43,6 +44,14 @@ class PetWindow(QWidget):
         "normal": (45, 90),
         "high": (20, 45),
     }
+    WALK_RANGES = CHATTER_RANGES
+    MOODS = {
+        "calm": ("·", QColor("#78a9c7"), "平静"),
+        "happy": ("♥", QColor("#ef7770"), "开心"),
+        "playful": ("♪", QColor("#f2bd45"), "调皮"),
+        "sleepy": ("Z", QColor("#8c83c6"), "困倦"),
+        "grumpy": ("!", QColor("#e76e55"), "小生气"),
+    }
 
     def __init__(self):
         super().__init__()
@@ -61,7 +70,7 @@ class PetWindow(QWidget):
         self.state_tick = 0
         self.last_touch = time.monotonic()
         self.until = 0.0
-        self.next_walk = time.monotonic() + random.uniform(5, 10)
+        self.next_walk = 0.0
         self.direction = 1
         self.edge_until = 0.0
         self.edge_side = None
@@ -76,6 +85,11 @@ class PetWindow(QWidget):
         self.click_times = []
         self.sleep_after = 60
         self.settings = QSettings("DesktopPet", "CartoonPet")
+        self.sleep_after = max(15, self.settings.value("behavior/sleep_after", 60, type=int))
+        self.auto_walk_enabled = self.settings.value("behavior/auto_walk", True, type=bool)
+        self.walk_frequency = self.settings.value("behavior/walk_frequency", "normal", type=str)
+        if self.walk_frequency not in self.WALK_RANGES:
+            self.walk_frequency = "normal"
         self.dialogue_enabled = self.settings.value("dialogue/enabled", True, type=bool)
         requested_voice = self.settings.value("voice/enabled", True, type=bool)
         self.voice = VoiceEngine()
@@ -87,6 +101,10 @@ class PetWindow(QWidget):
         self.bubble = SpeechBubble()
         self.reminder_store = ReminderStore(user_data_file("reminders.json"))
         self.active_reminder = None
+        self.mood = self.settings.value("mood/current", "calm", type=str)
+        if self.mood not in self.MOODS:
+            self.mood = "calm"
+        self.mood_until = 0.0
         self.dialogue_cooldown_until = 0.0
         self.next_chatter = 0.0
         stored_focus_end = self.settings.value("focus/end_epoch", 0.0, type=float)
@@ -96,6 +114,7 @@ class PetWindow(QWidget):
         self.last_clock_minute = None
         self.last_late_night_date = self.settings.value(
             "time/late_night_date", "", type=str)
+        self.schedule_next_walk()
         self.schedule_next_chatter()
         self.reset_position()
         self.timer = QTimer(self)
@@ -109,6 +128,43 @@ class PetWindow(QWidget):
     def schedule_next_chatter(self, now=None):
         low, high = self.CHATTER_RANGES[self.chatter_level]
         self.next_chatter = (time.monotonic() if now is None else now) + random.uniform(low, high)
+
+    def schedule_next_walk(self, now=None):
+        low, high = self.WALK_RANGES[self.walk_frequency]
+        self.next_walk = (time.monotonic() if now is None else now) + random.uniform(low, high)
+
+    def set_mood(self, mood, duration=0):
+        if mood not in self.MOODS:
+            return
+        self.mood = mood
+        self.mood_until = time.monotonic() + max(0, float(duration)) if duration else 0.0
+        self.settings.setValue("mood/current", mood)
+        self.update()
+
+    def mood_text(self):
+        return self.MOODS.get(self.mood, self.MOODS["calm"])[2]
+
+    def open_settings_center(self):
+        dialog = SettingsDialog(self, self)
+        dialog.exec()
+        dialog.deleteLater()
+
+    def apply_user_settings(self, values):
+        self.auto_walk_enabled = bool(values.get("auto_walk", self.auto_walk_enabled))
+        self.walk_frequency = values.get("walk_frequency", self.walk_frequency)
+        if self.walk_frequency not in self.WALK_RANGES:
+            self.walk_frequency = "normal"
+        self.sleep_after = max(15, int(values.get("sleep_after", self.sleep_after)))
+        self.settings.setValue("behavior/auto_walk", self.auto_walk_enabled)
+        self.settings.setValue("behavior/walk_frequency", self.walk_frequency)
+        self.settings.setValue("behavior/sleep_after", self.sleep_after)
+        self.set_dialogue_enabled(bool(values.get("dialogue_enabled", self.dialogue_enabled)))
+        self.set_voice_enabled(bool(values.get("voice_enabled", self.voice_enabled)))
+        if not self.auto_walk_enabled and self.state == "Walk":
+            self.set_state("Idle")
+        self.schedule_next_walk()
+        self.set_mood("happy", 5)
+        self.show_message("设置保存好啦！", force=True)
 
     def show_message(self, text, force=False, duration_ms=3200):
         if self.active_reminder is not None:
@@ -137,6 +193,7 @@ class PetWindow(QWidget):
     def show_active_reminder(self):
         if self.active_reminder is None:
             return
+        self.set_mood("grumpy", 4)
         text = f"提醒：{self.active_reminder['text']}\n点击我确认完成"
         self.bubble.show_text(
             text,
@@ -176,6 +233,7 @@ class PetWindow(QWidget):
             return
         reminder_id = self.active_reminder["id"]
         if self.reminder_store.complete(reminder_id):
+            self.set_mood("happy", 8)
             self.active_reminder = None
             self.bubble.hide()
             if not self.edge_side:
@@ -217,6 +275,7 @@ class PetWindow(QWidget):
         self.next_walk = time.monotonic() + minutes * 60
         if not self.edge_side:
             self.set_state("Idle")
+        self.set_mood("calm", minutes * 60)
         self.talk("focus_start", force=True)
 
     def show_focus_remaining(self):
@@ -253,6 +312,7 @@ class PetWindow(QWidget):
         if not was_active:
             return
         if completed:
+            self.set_mood("happy", 8)
             if not self.edge_side:
                 self.until = time.monotonic() + 2.0
                 self.set_state("Click")
@@ -523,6 +583,8 @@ class PetWindow(QWidget):
     def tick(self):
         self.state_tick += 1
         now = time.monotonic()
+        if self.mood_until and now >= self.mood_until:
+            self.set_mood("calm")
         if self.bubble.isVisible():
             self.bubble.follow(self.frameGeometry(), self.screen_area())
         if self.press is not None or self.menu_open:
@@ -573,12 +635,14 @@ class PetWindow(QWidget):
         idle = now - self.last_touch if system_idle is None else min(system_idle, now - self.last_touch)
         if idle >= self.sleep_after:
             if self.state != "Sleep":
+                self.set_mood("sleepy")
                 self.talk("sleep", force=True)
             self.set_state("Sleep")
             return
         if self.state == "Sleep":
             self.set_state("Look" if self.hovered else "Idle")
             self.next_walk = now + 5
+            self.set_mood("happy", 8)
             self.talk("wake", force=True)
         elif self.state in ("Click", "Angry"):
             if now >= self.until:
@@ -596,16 +660,19 @@ class PetWindow(QWidget):
                 return
             if now >= self.until:
                 self.set_state("Look" if self.hovered else "Idle")
-                self.next_walk = now + random.uniform(5, 12)
+                self.schedule_next_walk(now)
         elif self.hovered:
             self.set_state("Look")
         elif self.state == "Look":
             self.set_state("Idle")
-        elif now >= self.next_walk:
+        elif self.auto_walk_enabled and now >= self.next_walk:
             self.direction = random.choice((-1, 1))
             self.until = now + random.uniform(2, 5)
             self.set_state("Walk")
+            self.set_mood("playful", 8)
             self.talk("walk")
+        elif not self.auto_walk_enabled:
+            self.next_walk = now + 60
         self.update()
 
     def paintEvent(self, event):
@@ -625,6 +692,16 @@ class PetWindow(QWidget):
         if flip:
             p.translate(self.width(), 0); p.scale(-1, 1)
         p.drawImage(self.rect(), image)
+        p.resetTransform()
+        if self.state not in ("Sleep", "Edge"):
+            symbol, color, _ = self.MOODS.get(self.mood, self.MOODS["calm"])
+            badge = QRectF(self.width() - 24, 3, 20, 20)
+            p.setPen(Qt.PenStyle.NoPen)
+            p.setBrush(color)
+            p.drawEllipse(badge)
+            p.setPen(QColor("#fffaf0"))
+            p.setFont(QFont("Segoe UI Symbol", 11, QFont.Weight.Bold))
+            p.drawText(badge, Qt.AlignmentFlag.AlignCenter, symbol)
 
     def enterEvent(self, event):
         self.hovered = True
@@ -659,6 +736,7 @@ class PetWindow(QWidget):
             if delta.manhattanLength() >= QApplication.startDragDistance():
                 if not self.dragging:
                     self.dragging = True
+                    self.set_mood("playful", 5)
                     if not self.focus_active():
                         self.talk("drag", force=True)
             if self.dragging:
@@ -698,9 +776,11 @@ class PetWindow(QWidget):
             self.click_times.append(now)
             if len(self.click_times) >= 4:
                 self.click_times.clear(); self.until = now + 2.4; self.set_state("Angry")
+                self.set_mood("grumpy", 5)
                 self.talk("angry", force=True)
             else:
                 self.until = now + 1.0; self.set_state("Click")
+                self.set_mood("playful", 3)
                 self.talk("click", force=True)
         self.keep_visible()
 
@@ -710,6 +790,7 @@ class PetWindow(QWidget):
         count = self.pending_reminder_count()
         reminder_label = "提醒中心…" if count == 0 else f"提醒中心…（{count}）"
         menu.addAction(reminder_label, self.open_reminder_center)
+        menu.addAction(f"设置中心…（当前心情：{self.mood_text()}）", self.open_settings_center)
         menu.addSeparator()
         focus_menu = menu.addMenu("专注计时")
         if self.focus_active():

@@ -24,13 +24,17 @@ with tempfile.TemporaryDirectory() as folder:
     store = ReminderStore(path)
     due = store.add("提交测试报告", time.time() - 2)
     future = store.add("十分钟后喝水", time.time() + 600)
+    recurring = store.add("每天拉伸", time.time() - 2, "daily")
     assert path.exists()
     payload = json.loads(path.read_text(encoding="utf-8"))
-    assert payload["version"] == 1 and len(payload["reminders"]) == 2
+    assert payload["version"] == 1 and len(payload["reminders"]) == 3
 
     reloaded = ReminderStore(path)
-    assert [item["id"] for item in reloaded.due()] == [due["id"]]
-    assert len(reloaded.pending()) == 2
+    assert [item["id"] for item in reloaded.due()] == [due["id"], recurring["id"]]
+    assert len(reloaded.pending()) == 3
+    assert reloaded.complete(recurring["id"])
+    assert reloaded.get(recurring["id"])["status"] == "pending"
+    assert reloaded.get(recurring["id"])["due_at"] > time.time()
 
     w = PetWindow()
     w.timer.stop()
@@ -66,7 +70,7 @@ with tempfile.TemporaryDirectory() as folder:
     center.add_reminder()
     assert added and added[0]["text"] == "页面内新建提醒"
     assert "已添加" in center.add_feedback.text()
-    assert len(reloaded.pending()) == 2
+    assert len(reloaded.pending()) == 3
     center.close()
 
     assert reloaded.delete(future["id"])
@@ -74,4 +78,4 @@ with tempfile.TemporaryDirectory() as folder:
     w.close()
 
 print("PASS: atomic JSON persistence; due detection; persistent bold dark alert; "
-      "click acknowledgement; snooze/delete; single reminder-center page")
+      "click acknowledgement; daily repeat; snooze/delete; single reminder-center page")
